@@ -149,3 +149,27 @@
   ;; Retrieve complete identity information for a given principal
   (map-get? identities { owner: owner })
 )
+
+(define-read-only (verify-reputation
+    (owner principal)
+    (min-reputation-threshold uint)
+  )
+  ;; Verify if an identity meets the minimum reputation threshold
+  (match (map-get? identities { owner: owner })
+    identity (if (>= (get reputation-score identity) min-reputation-threshold)
+      (some true)
+      none
+    )
+    none
+  )
+)
+
+(define-read-only (get-action-multiplier (action-type (string-ascii 50)))
+  ;; Get the reputation multiplier for a specific action type
+  (map-get? reputation-actions { action-type: action-type })
+)
+
+;; CONTRACT INITIALIZATION
+
+;; Initialize reputation actions on contract deployment
+(initialize-reputation-actions)
