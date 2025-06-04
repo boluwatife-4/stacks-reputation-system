@@ -84,3 +84,68 @@
     )
   )
 )
+
+(define-public (update-reputation (action-type (string-ascii 50)))
+  ;; Update reputation score based on verified on-chain action
+  (let (
+      (owner tx-sender)
+      (current-identity (unwrap! (map-get? identities { owner: owner }) ERR-IDENTITY-NOT-FOUND))
+      (action-multiplier (default-to u0
+        (get multiplier
+          (map-get? reputation-actions { action-type: action-type })
+        )))
+      (current-score (get reputation-score current-identity))
+      (updated-score (if (< (+ current-score action-multiplier) MAX-REPUTATION-SCORE)
+        (+ current-score action-multiplier)
+        MAX-REPUTATION-SCORE
+      ))
+    )
+    (begin
+      ;; Validate action type exists
+      (asserts!
+        (is-some (map-get? reputation-actions { action-type: action-type }))
+        ERR-INVALID-PARAMETERS
+      )
+      ;; Update identity with new score
+      (map-set identities { owner: owner }
+        (merge current-identity {
+          reputation-score: updated-score,
+          last-updated: stacks-block-height,
+        })
+      )
+      (ok updated-score)
+    )
+  )
+)
+
+(define-public (decay-reputation)
+  ;; Apply time-based reputation decay to prevent score inflation
+  (let (
+      (owner tx-sender)
+      (current-identity (unwrap! (map-get? identities { owner: owner }) ERR-IDENTITY-NOT-FOUND))
+      (current-score (get reputation-score current-identity))
+      (decay-amount (/ (* current-score REPUTATION-DECAY-RATE) u100))
+      (updated-score (if (> (- current-score decay-amount) MIN-REPUTATION-SCORE)
+        (- current-score decay-amount)
+        MIN-REPUTATION-SCORE
+      ))
+    )
+    (begin
+      ;; Apply decay to reputation score
+      (map-set identities { owner: owner }
+        (merge current-identity {
+          reputation-score: updated-score,
+          last-updated: stacks-block-height,
+        })
+      )
+      (ok updated-score)
+    )
+  )
+)
+
+;; READ-ONLY FUNCTIONS
+
+(define-read-only (get-reputation (owner principal))
+  ;; Retrieve complete identity information for a given principal
+  (map-get? identities { owner: owner })
+)
